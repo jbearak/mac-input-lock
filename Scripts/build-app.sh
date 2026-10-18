@@ -56,11 +56,7 @@ verify_bundle() {
     return 1
 }
 
-version=${VERSION:-}
-if [ -z "$version" ]; then
-    version=$(git -C "$project_dir" describe --tags --match 'v[0-9]*' --exact-match 2>/dev/null | sed 's/^v//' || true)
-fi
-version=${version:-0.0.0}
+version=${VERSION:-$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$project_dir/Resources/Info.plist")}
 
 build_number=${BUILD_NUMBER:-}
 if [ -z "$build_number" ]; then
@@ -103,30 +99,17 @@ else
     binary_dir=$(swift_build -c "$configuration" --show-bin-path)
 fi
 
-mkdir -p "$build_app_dir/Contents/MacOS" "$build_app_dir/Contents/Resources" "$build_app_dir/Contents/Frameworks"
+mkdir -p "$build_app_dir/Contents/MacOS" "$build_app_dir/Contents/Resources"
 cp "$binary_dir/MacInputLock" "$build_app_dir/Contents/MacOS/MacInputLock"
-ditto "$binary_dir/Sparkle.framework" "$build_app_dir/Contents/Frameworks/Sparkle.framework"
 cp "$project_dir/Resources/Info.plist" "$build_app_dir/Contents/Info.plist"
 cp "$project_dir/Resources/MacInputLock.icns" "$build_app_dir/Contents/Resources/MacInputLock.icns"
-cp "$project_dir/.build/checkouts/Sparkle/LICENSE" "$build_app_dir/Contents/Resources/Sparkle-LICENSE.txt"
-swift "$project_dir/Scripts/create-dmg-background.swift" \
-    "$build_app_dir/Contents/Resources/InstallerBackground.png"
-chmod 644 "$build_app_dir/Contents/Resources/Sparkle-LICENSE.txt"
 plutil -replace CFBundleShortVersionString -string "$version" "$build_app_dir/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$build_number" "$build_app_dir/Contents/Info.plist"
 
 strip_disallowed_xattrs "$build_app_dir"
 if [ "$signing_identity" = "-" ]; then
-    codesign --force --deep --options runtime \
-        --preserve-metadata=identifier,entitlements,flags \
-        --sign - "$build_app_dir/Contents/Frameworks/Sparkle.framework"
-    codesign --force --options runtime \
-        --entitlements "$project_dir/Resources/Debug.entitlements" \
-        --sign - "$build_app_dir"
+    codesign --force --options runtime --sign - "$build_app_dir"
 else
-    codesign --force --deep --options runtime --timestamp \
-        --preserve-metadata=identifier,entitlements,flags \
-        --sign "$signing_identity" "$build_app_dir/Contents/Frameworks/Sparkle.framework"
     codesign --force --options runtime --timestamp --sign "$signing_identity" "$build_app_dir"
 fi
 
