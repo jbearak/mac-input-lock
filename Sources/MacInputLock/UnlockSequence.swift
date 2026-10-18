@@ -1,7 +1,7 @@
 import Foundation
 
 struct UnlockSequence: Equatable, Sendable {
-    static let defaultValue = "unlock"
+    static let defaultValue = "sesame"
     static let minimumLength = 1
 
     let value: String

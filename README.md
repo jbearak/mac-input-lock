@@ -4,6 +4,27 @@
 
 # Mac Input Lock
 
+## Personal fork
+
+Maintained at https://github.com/jbearak/mac-input-lock, based on
+[nickdoesntwantspam/mac-input-lock](https://github.com/nickdoesntwantspam/mac-input-lock).
+The MIT license and upstream attribution are preserved.
+
+This fork defaults to `sesame` for unlocking and uses the separate app identifier
+`com.jbearak.MacInputLock`. Upstream update behavior is unchanged.
+
+For this Mac's installed Command Line Tools:
+
+```sh
+DEVELOPER_DIR=/Library/Developer/CommandLineTools SIGNING_IDENTITY=- ./Scripts/build-app.sh
+```
+
+The build script selects the installed macOS 26.5 SDK and native SwiftPM backend
+when using Command Line Tools, avoiding the macOS 27 SDK's missing SwiftUI macro
+plugin. Set `SDKROOT` and `SWIFT_BUILD_SYSTEM` to override those choices.
+
+The remaining documentation describes the upstream app.
+
 Temporarily disable every keyboard, mouse, and trackpad connected to your Mac without interrupting video calls, playback, audio, camera, microphone, or anything already running.
 
 Mac Input Lock is a focused, open-source menu-bar utility for toddlers, pets, keyboard cleaning, uninterrupted playback, and any situation where accidental input needs to stop. It has no accounts, analytics, background service, advertising, or telemetry. Its only network activity is checking for software updates when you request it or opt into automatic checks.

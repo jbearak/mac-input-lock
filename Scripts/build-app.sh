@@ -9,6 +9,30 @@ build_app_dir="$assembly_dir/Mac Input Lock.app"
 trap 'rm -rf "$assembly_dir"' EXIT INT TERM
 universal=${UNIVERSAL:-0}
 
+# Some Command Line Tools SDKs lack the newer SwiftUI macro plugin.
+# Use the installed compatible SDK unless explicitly overridden.
+developer_dir=${DEVELOPER_DIR:-$(xcode-select -p)}
+case "$developer_dir" in
+    */CommandLineTools)
+        if [ -z "${SDKROOT:-}" ] && [ -d "$developer_dir/SDKs/MacOSX26.5.sdk" ]; then
+            SDKROOT="$developer_dir/SDKs/MacOSX26.5.sdk"
+            export SDKROOT
+        fi
+        SWIFT_BUILD_SYSTEM=${SWIFT_BUILD_SYSTEM:-native}
+        ;;
+esac
+
+swift_build() {
+    set -- build "$@"
+    if [ -n "${SWIFT_BUILD_SYSTEM:-}" ]; then
+        set -- "$@" --build-system "$SWIFT_BUILD_SYSTEM"
+    fi
+    if [ -n "${SDKROOT:-}" ]; then
+        set -- "$@" --sdk "$SDKROOT"
+    fi
+    swift "$@"
+}
+
 strip_disallowed_xattrs() {
     xattr -cr "$1"
     find "$1" -exec xattr -d com.apple.FinderInfo {} \; 2>/dev/null || true
@@ -72,11 +96,11 @@ fi
 
 cd "$project_dir"
 if [ "$universal" = "1" ]; then
-    swift build -c "$configuration" --arch arm64 --arch x86_64
-    binary_dir=$(swift build -c "$configuration" --arch arm64 --arch x86_64 --show-bin-path)
+    swift_build -c "$configuration" --arch arm64 --arch x86_64
+    binary_dir=$(swift_build -c "$configuration" --arch arm64 --arch x86_64 --show-bin-path)
 else
-    swift build -c "$configuration"
-    binary_dir=$(swift build -c "$configuration" --show-bin-path)
+    swift_build -c "$configuration"
+    binary_dir=$(swift_build -c "$configuration" --show-bin-path)
 fi
 
 mkdir -p "$build_app_dir/Contents/MacOS" "$build_app_dir/Contents/Resources" "$build_app_dir/Contents/Frameworks"
