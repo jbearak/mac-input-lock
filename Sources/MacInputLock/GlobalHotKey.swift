@@ -7,8 +7,8 @@ final class GlobalHotKey {
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
-    init() {
-        start()
+    init(startAutomatically: Bool = true) {
+        if startAutomatically { start() }
     }
 
     func start() {

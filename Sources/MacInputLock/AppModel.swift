@@ -20,23 +20,56 @@ final class AppModel {
     private let blocker: InputBlocker
     private let defaults: UserDefaults
     private let hotKey: GlobalHotKey
+    private let checkAccessibility: @MainActor () -> Bool
+    private var accessibilityTask: Task<Void, Never>?
     private var transitionTask: Task<Void, Never>?
 
+    private(set) var hasAccessibilityAccess: Bool
     var state: State = .idle
     var sequenceText: String
 
     init(
         blocker: InputBlocker = InputBlocker(),
         defaults: UserDefaults = .standard,
-        hotKey: GlobalHotKey = GlobalHotKey()
+        hotKey: GlobalHotKey = GlobalHotKey(),
+        checkAccessibility: @escaping @MainActor () -> Bool = { AccessibilityPermission.isGranted }
     ) {
         self.blocker = blocker
         self.defaults = defaults
         self.hotKey = hotKey
+        self.checkAccessibility = checkAccessibility
+        hasAccessibilityAccess = checkAccessibility()
         sequenceText = defaults.string(forKey: DefaultsKey.unlockSequence) ?? UnlockSequence.defaultValue
         hotKey.onPress = { [weak self] in
             self?.toggleInstantLock()
         }
+    }
+
+    func refreshAccessibility() {
+        let granted = checkAccessibility()
+        guard granted != hasAccessibilityAccess else { return }
+        hasAccessibilityAccess = granted
+        if granted {
+            // A monitor created before permission was granted may not receive keys.
+            hotKey.stop()
+            hotKey.start()
+        }
+    }
+
+    func startMonitoringAccessibility() {
+        guard accessibilityTask == nil else { return }
+        accessibilityTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                self?.refreshAccessibility()
+                do { try await Task.sleep(for: .seconds(1)) }
+                catch { return }
+            }
+        }
+    }
+
+    func stopMonitoringAccessibility() {
+        accessibilityTask?.cancel()
+        accessibilityTask = nil
     }
 
     var validationMessage: String? {
@@ -103,7 +136,8 @@ final class AppModel {
 
     private func preparedSequence() throws -> UnlockSequence {
         let sequence = try UnlockSequence(sequenceText)
-        guard AccessibilityPermission.isGranted else {
+        refreshAccessibility()
+        guard hasAccessibilityAccess else {
             AccessibilityPermission.request()
             throw ShortcutError.accessibilityRequired
         }

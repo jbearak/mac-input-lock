@@ -7,7 +7,7 @@ struct LockControlsView: View {
     let dismiss: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @FocusState private var editingSequence: Bool
-    @State private var hasAccess = AccessibilityPermission.isGranted
+    private var hasAccess: Bool { model.hasAccessibilityAccess }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,9 +28,9 @@ struct LockControlsView: View {
         .background(Color(nsColor: .windowBackgroundColor))
         .tint(.indigo)
         .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: isActive)
-        .onAppear { hasAccess = AccessibilityPermission.isGranted }
+        .onAppear { model.refreshAccessibility() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            hasAccess = AccessibilityPermission.isGranted
+            model.refreshAccessibility()
         }
         .onChange(of: model.sequenceText) { _, _ in model.saveSequence() }
         .task(id: isLocked) {
@@ -86,9 +86,12 @@ struct LockControlsView: View {
                         Text("Allow Accessibility access to block input.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Button("Open Settings…", action: openAccessibilitySettings)
-                            .buttonStyle(.link)
-                            .font(.callout)
+                        HStack(spacing: 12) {
+                            Button("Open Settings…", action: openAccessibilitySettings)
+                            Button("Already enabled?", action: showPermissionHelp)
+                        }
+                        .buttonStyle(.link)
+                        .font(.callout)
                     }
                 }
             }
@@ -102,16 +105,21 @@ struct LockControlsView: View {
 
             Button {
                 editingSequence = false
-                model.start()
+                model.refreshAccessibility()
+                if model.hasAccessibilityAccess {
+                    model.start()
+                } else {
+                    openAccessibilitySettings()
+                }
             } label: {
-                Label("Lock input", systemImage: "lock.fill")
+                Label(hasAccess ? "Lock input" : "Enable input locking…", systemImage: hasAccess ? "lock.fill" : "hand.raised")
                     .font(.body.weight(.semibold))
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
-            .disabled(model.validationMessage != nil || !hasAccess)
+            .disabled(model.validationMessage != nil)
             .help("Blocks keyboard, mouse, and trackpad after five seconds")
             Text("Blocks keyboard, mouse and trackpad.")
                 .font(.caption)
@@ -202,6 +210,17 @@ struct LockControlsView: View {
         case .arming, .locked: true
         default: false
         }
+    }
+
+    private func showPermissionHelp() {
+        model.refreshAccessibility()
+        guard !model.hasAccessibilityAccess else { return }
+        let alert = NSAlert()
+        alert.messageText = "Refresh Accessibility access"
+        alert.informativeText = "macOS may still trust a previous build. In Accessibility settings, select Mac Input Lock, click − to remove it, then click + and choose /Applications/Mac Input Lock.app. The app checks for access automatically."
+        alert.addButton(withTitle: "Open Settings")
+        alert.addButton(withTitle: "Cancel")
+        if alert.runModal() == .alertFirstButtonReturn { openAccessibilitySettings() }
     }
 
     private func openAccessibilitySettings() {

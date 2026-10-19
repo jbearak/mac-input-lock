@@ -26,10 +26,14 @@ final class StatusBarController: NSObject {
         for name in [NSWorkspace.didWakeNotification, NSWorkspace.activeSpaceDidChangeNotification] {
             NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(displayChanged), name: name, object: nil)
         }
+        model.startMonitoringAccessibility()
         observeState()
     }
 
-    func stop() { model.stop() }
+    func stop() {
+        model.stopMonitoringAccessibility()
+        model.stop()
+    }
 
     func showOnLaunch() {
         let visible = statusItemIsVisible
@@ -38,6 +42,7 @@ final class StatusBarController: NSObject {
     }
 
     func showWindow() {
+        model.refreshAccessibility()
         popover.performClose(nil)
         if window == nil {
             let window = NSWindow(
@@ -66,6 +71,7 @@ final class StatusBarController: NSObject {
     }
 
     @objc private func togglePopover() {
+        model.refreshAccessibility()
         if popover.isShown {
             popover.performClose(nil)
         } else if let button = statusItem.button {
